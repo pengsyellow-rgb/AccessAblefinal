@@ -10,17 +10,17 @@
   <script src="https://cdn.tailwindcss.com"></script>
 
   <style>
-    body { font-family: Arial, sans-serif; }
+    body { font-family: 'Inter', sans-serif; }
     .dyslexic {
-      letter-spacing: 0.15em;
-      word-spacing: 0.3em;
+      letter-spacing: 0.12em;
+      word-spacing: 0.25em;
       line-height: 2;
     }
     .ruler {
       position: absolute;
       left: 0;
       right: 0;
-      height: 40px;
+      height: 45px;
       background: rgba(59,130,246,0.15);
       border-top: 2px solid #3b82f6;
       border-bottom: 2px solid #3b82f6;
@@ -29,28 +29,190 @@
   </style>
 </head>
 
-<body class="bg-gray-100">
-  <div id="root"></div>
+<body class="bg-slate-100">
+<div id="root"></div>
 
 <script type="text/babel">
 
 const { useState, useEffect } = React;
 
-function App() {
+/* ---------------- AUTH COMPONENT ---------------- */
 
-  // ---------------- Auth ----------------
-  const [accounts, setAccounts] = useState(
-    JSON.parse(localStorage.getItem("accounts")) || []
-  );
-
-  const [user, setUser] = useState(
-    JSON.parse(localStorage.getItem("currentUser")) || null
-  );
-
+function Auth({ onLogin }) {
   const [mode, setMode] = useState("login");
   const [error, setError] = useState("");
 
-  // ---------------- Notes ----------------
+  const accounts = JSON.parse(localStorage.getItem("accounts")) || [];
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    const { username, email, identifier, password } = e.target;
+
+    if (mode === "signup") {
+      const newAccount = {
+        username: username.value,
+        email: email.value,
+        password: password.value
+      };
+      localStorage.setItem("accounts", JSON.stringify([...accounts, newAccount]));
+      setMode("login");
+      return;
+    }
+
+    const found = accounts.find(a =>
+      (a.username === identifier.value || a.email === identifier.value)
+      && a.password === password.value
+    );
+
+    if (found) {
+      localStorage.setItem("currentUser", JSON.stringify(found));
+      onLogin(found);
+    } else {
+      setError("Invalid credentials.");
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="bg-white w-96 p-10 rounded-3xl shadow-xl">
+        <h1 className="text-3xl font-bold mb-6 text-center">
+          {mode === "login" ? "Login" : "Create Account"}
+        </h1>
+
+        {error && <p className="text-red-500 mb-4">{error}</p>}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {mode === "signup" && (
+            <>
+              <input name="username" required placeholder="Username" className="w-full p-3 bg-slate-100 rounded-xl"/>
+              <input name="email" required type="email" placeholder="Email" className="w-full p-3 bg-slate-100 rounded-xl"/>
+            </>
+          )}
+          <input name="identifier" required placeholder="Username or Email" className="w-full p-3 bg-slate-100 rounded-xl"/>
+          <input name="password" required type="password" placeholder="Password" className="w-full p-3 bg-slate-100 rounded-xl"/>
+
+          <button className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold">
+            {mode === "login" ? "Login" : "Sign Up"}
+          </button>
+        </form>
+
+        <button
+          onClick={() => setMode(mode === "login" ? "signup" : "login")}
+          className="mt-4 text-sm text-blue-600"
+        >
+          {mode === "login" ? "Need an account?" : "Already have one?"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- SIDEBAR ---------------- */
+
+function Sidebar({ notes, setActiveNote, createNote }) {
+  return (
+    <div className="w-72 bg-white border-r p-6">
+      <button
+        onClick={createNote}
+        className="w-full mb-6 py-3 bg-blue-600 text-white rounded-xl font-semibold"
+      >
+        + New Note
+      </button>
+
+      <div className="space-y-3">
+        {notes.map(note => (
+          <div
+            key={note.id}
+            onClick={() => setActiveNote(note)}
+            className="p-3 bg-slate-100 rounded-xl cursor-pointer hover:bg-slate-200"
+          >
+            {note.title}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- TOOLBAR ---------------- */
+
+function Toolbar({
+  fontSize, setFontSize,
+  contrast, setContrast,
+  dyslexic, setDyslexic,
+  rulerOn, setRulerOn,
+  speed, setSpeed,
+  speechState, toggleSpeech, stopSpeech,
+  saveNote
+}) {
+
+  const themes = {
+    light: "Light",
+    dark: "Dark",
+    high: "High Contrast"
+  };
+
+  return (
+    <div className="flex flex-wrap gap-3 mb-4">
+      <button onClick={() => setFontSize(f => f + 2)}>A+</button>
+      <button onClick={() => setFontSize(f => Math.max(12, f - 2))}>A-</button>
+
+      <button
+        onClick={() =>
+          setContrast(contrast === "light"
+            ? "dark"
+            : contrast === "dark"
+            ? "high"
+            : "light")
+        }
+      >
+        {themes[contrast]}
+      </button>
+
+      <button onClick={() => setDyslexic(!dyslexic)}>
+        Dyslexic
+      </button>
+
+      <button onClick={() => setRulerOn(!rulerOn)}>
+        Ruler
+      </button>
+
+      <button onClick={toggleSpeech}>
+        {speechState === "playing"
+          ? "Pause"
+          : speechState === "paused"
+          ? "Resume"
+          : "Listen"}
+      </button>
+
+      <button onClick={stopSpeech}>Stop</button>
+
+      <button onClick={saveNote} className="bg-blue-600 text-white px-4 rounded-lg">
+        Save
+      </button>
+
+      <div>
+        Speed:
+        <input
+          type="range"
+          min="0.5"
+          max="2"
+          step="0.1"
+          value={speed}
+          onChange={(e) => setSpeed(parseFloat(e.target.value))}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- MAIN APP ---------------- */
+
+function App() {
+  const [user, setUser] = useState(
+    JSON.parse(localStorage.getItem("currentUser"))
+  );
+
   const [notes, setNotes] = useState(
     JSON.parse(localStorage.getItem("notes")) || []
   );
@@ -61,7 +223,6 @@ function App() {
     content: ""
   });
 
-  // ---------------- Settings ----------------
   const [fontSize, setFontSize] = useState(20);
   const [contrast, setContrast] = useState("light");
   const [dyslexic, setDyslexic] = useState(false);
@@ -70,76 +231,36 @@ function App() {
   const [speed, setSpeed] = useState(1);
   const [speechState, setSpeechState] = useState("stopped");
 
-  // ---------------- Save to localStorage ----------------
-  useEffect(() => {
-    localStorage.setItem("accounts", JSON.stringify(accounts));
-  }, [accounts]);
-
   useEffect(() => {
     localStorage.setItem("notes", JSON.stringify(notes));
   }, [notes]);
 
-  // ---------------- Auth Functions ----------------
-  function handleSignup(e) {
-    e.preventDefault();
-    const { username, email, password } = e.target;
-
-    const newAccount = {
-      username: username.value,
-      email: email.value,
-      password: password.value
-    };
-
-    setAccounts([...accounts, newAccount]);
-    setMode("login");
-    alert("Account created!");
+  function createNote() {
+    setActiveNote({
+      id: Date.now(),
+      title: "New Note",
+      content: ""
+    });
   }
 
-  function handleLogin(e) {
-    e.preventDefault();
-    const { identifier, password } = e.target;
-
-    const found = accounts.find(
-      a =>
-        (a.username === identifier.value ||
-         a.email === identifier.value) &&
-        a.password === password.value
-    );
-
-    if (found) {
-      setUser(found);
-      localStorage.setItem("currentUser", JSON.stringify(found));
-    } else {
-      setError("Invalid login.");
-    }
+  function saveNote() {
+    const updated = notes.filter(n => n.id !== activeNote.id);
+    setNotes([activeNote, ...updated]);
   }
 
-  function logout() {
-    window.speechSynthesis.cancel();
-    setUser(null);
-    localStorage.removeItem("currentUser");
-  }
-
-  // ---------------- Speech ----------------
   function toggleSpeech() {
     const synth = window.speechSynthesis;
 
     if (speechState === "stopped") {
-      const utterance = new SpeechSynthesisUtterance(
-        activeNote.content || "Nothing to read"
-      );
+      const utterance = new SpeechSynthesisUtterance(activeNote.content || "Nothing to read");
       utterance.rate = speed;
-
       utterance.onstart = () => setSpeechState("playing");
       utterance.onend = () => setSpeechState("stopped");
-
       synth.speak(utterance);
-    }
-    else if (speechState === "playing") {
+    } else if (speechState === "playing") {
       synth.pause();
       setSpeechState("paused");
-    }
-    else if (speechState === "paused") {
+    } else {
       synth.resume();
       setSpeechState("playing");
     }
@@ -150,174 +271,70 @@ function App() {
     setSpeechState("stopped");
   }
 
-  // ---------------- Theme ----------------
-  const themes = {
+  function logout() {
+    localStorage.removeItem("currentUser");
+    window.speechSynthesis.cancel();
+    setUser(null);
+  }
+
+  const themeClasses = {
     light: "bg-white text-black",
     dark: "bg-black text-white",
     high: "bg-black text-yellow-400"
   };
 
-  // ---------------- If Not Logged In ----------------
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="bg-white p-8 rounded shadow w-80">
-          <h2 className="text-2xl font-bold mb-4 text-center">
-            {mode === "login" ? "Login" : "Sign Up"}
-          </h2>
+  if (!user) return <Auth onLogin={setUser} />;
 
-          {error && <p className="text-red-500 mb-2">{error}</p>}
-
-          <form onSubmit={mode === "login" ? handleLogin : handleSignup}>
-            {mode === "signup" && (
-              <>
-                <input name="username" placeholder="Username" required className="w-full mb-2 p-2 border"/>
-                <input name="email" type="email" placeholder="Email" required className="w-full mb-2 p-2 border"/>
-              </>
-            )}
-
-            <input name="identifier" placeholder="Username or Email" required className="w-full mb-2 p-2 border"/>
-            <input name="password" type="password" placeholder="Password" required className="w-full mb-4 p-2 border"/>
-
-            <button className="w-full bg-blue-500 text-white p-2">
-              {mode === "login" ? "Login" : "Create Account"}
-            </button>
-          </form>
-
-          <button
-            onClick={() => setMode(mode === "login" ? "signup" : "login")}
-            className="text-blue-500 text-sm mt-3"
-          >
-            {mode === "login" ? "Need an account?" : "Already have one?"}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ---------------- Main App ----------------
   return (
     <div className="h-screen flex flex-col">
 
-      <div className="bg-white p-4 flex justify-between">
+      <div className="bg-white flex justify-between p-4 border-b">
         <input
           value={activeNote.title}
-          onChange={(e) =>
-            setActiveNote({ ...activeNote, title: e.target.value })
-          }
-          className="border p-2"
+          onChange={(e) => setActiveNote({...activeNote, title: e.target.value})}
+          className="border p-2 rounded-lg"
         />
         <button onClick={logout} className="text-red-500">Logout</button>
       </div>
 
-      <div className="flex flex-1">
+      <div className="flex flex-1 overflow-hidden">
+        <Sidebar
+          notes={notes}
+          setActiveNote={setActiveNote}
+          createNote={createNote}
+        />
 
-        {/* Sidebar */}
-        <div className="w-60 bg-gray-200 p-4">
-          <button
-            onClick={() =>
-              setActiveNote({ id: Date.now(), title: "New Note", content: "" })
-            }
-            className="bg-blue-500 text-white p-2 w-full mb-4"
-          >
-            New Note
-          </button>
-
-          {notes.map(n => (
-            <div key={n.id}
-                 onClick={() => setActiveNote(n)}
-                 className="bg-white p-2 mb-2 cursor-pointer">
-              {n.title}
-            </div>
-          ))}
-        </div>
-
-        {/* Editor */}
         <div
           className="flex-1 p-6 relative"
           onMouseMove={(e) => {
             if (rulerOn) {
-              setRulerY(
-                e.clientY -
-                e.currentTarget.getBoundingClientRect().top
-              );
+              setRulerY(e.clientY - e.currentTarget.getBoundingClientRect().top);
             }
           }}
         >
-          {rulerOn &&
-            <div className="ruler" style={{ top: rulerY - 20 }}></div>
-          }
+          {rulerOn && <div className="ruler" style={{ top: rulerY - 22 }}></div>}
 
-          <div className="mb-4 flex gap-2 flex-wrap">
-
-            <button onClick={() => setFontSize(f => f + 2)}>A+</button>
-            <button onClick={() => setFontSize(f => f - 2)}>A-</button>
-
-            <button
-              onClick={() =>
-                setContrast(
-                  contrast === "light"
-                    ? "dark"
-                    : contrast === "dark"
-                    ? "high"
-                    : "light"
-                )
-              }
-            >
-              Contrast
-            </button>
-
-            <button onClick={() => setDyslexic(!dyslexic)}>
-              Dyslexic
-            </button>
-
-            <button onClick={() => setRulerOn(!rulerOn)}>
-              Ruler
-            </button>
-
-            <button onClick={toggleSpeech}>
-              {speechState === "playing"
-                ? "Pause"
-                : speechState === "paused"
-                ? "Resume"
-                : "Listen"}
-            </button>
-
-            <button onClick={stopSpeech}>Stop</button>
-
-            <button
-              onClick={() => {
-                const updated = notes.filter(n => n.id !== activeNote.id);
-                setNotes([activeNote, ...updated]);
-                alert("Saved");
-              }}
-            >
-              Save
-            </button>
-
-            <div>
-              Speed:
-              <input
-                type="range"
-                min="0.5"
-                max="2"
-                step="0.1"
-                value={speed}
-                onChange={(e) => setSpeed(parseFloat(e.target.value))}
-              />
-            </div>
-          </div>
+          <Toolbar
+            fontSize={fontSize} setFontSize={setFontSize}
+            contrast={contrast} setContrast={setContrast}
+            dyslexic={dyslexic} setDyslexic={setDyslexic}
+            rulerOn={rulerOn} setRulerOn={setRulerOn}
+            speed={speed} setSpeed={setSpeed}
+            speechState={speechState}
+            toggleSpeech={toggleSpeech}
+            stopSpeech={stopSpeech}
+            saveNote={saveNote}
+          />
 
           <textarea
-            className={`w-full h-[75%] border p-4 ${themes[contrast]} ${dyslexic ? "dyslexic" : ""}`}
+            className={`w-full h-[75%] p-6 rounded-2xl border ${themeClasses[contrast]} ${dyslexic ? "dyslexic" : ""}`}
             style={{ fontSize: fontSize }}
             value={activeNote.content}
             onChange={(e) =>
-              setActiveNote({ ...activeNote, content: e.target.value })
+              setActiveNote({...activeNote, content: e.target.value})
             }
           />
         </div>
-
       </div>
     </div>
   );
@@ -328,3 +345,4 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 </script>
 </body>
 </html>
+
