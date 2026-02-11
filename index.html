@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>AccessAble</title>
+
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    body { font-family: Arial, sans-serif; }
+    .dyslexic {
+      letter-spacing: 0.15em;
+      word-spacing: 0.3em;
+      line-height: 2;
+    }
+    .ruler {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 40px;
+      background: rgba(59,130,246,0.15);
+      border-top: 2px solid #3b82f6;
+      border-bottom: 2px solid #3b82f6;
+      pointer-events: none;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-100">
+  <div id="root"></div>
+
+<script type="text/babel">
+
+const { useState, useEffect } = React;
+
+function App() {
+
+  // ---------------- Auth ----------------
+  const [accounts, setAccounts] = useState(
+    JSON.parse(localStorage.getItem("accounts")) || []
+  );
+
+  const [user, setUser] = useState(
+    JSON.parse(localStorage.getItem("currentUser")) || null
+  );
+
+  const [mode, setMode] = useState("login");
+  const [error, setError] = useState("");
+
+  // ---------------- Notes ----------------
+  const [notes, setNotes] = useState(
+    JSON.parse(localStorage.getItem("notes")) || []
+  );
+
+  const [activeNote, setActiveNote] = useState({
+    id: Date.now(),
+    title: "Untitled",
+    content: ""
+  });
+
+  // ---------------- Settings ----------------
+  const [fontSize, setFontSize] = useState(20);
+  const [contrast, setContrast] = useState("light");
+  const [dyslexic, setDyslexic] = useState(false);
+  const [rulerOn, setRulerOn] = useState(false);
+  const [rulerY, setRulerY] = useState(0);
+  const [speed, setSpeed] = useState(1);
+  const [speechState, setSpeechState] = useState("stopped");
+
+  // ---------------- Save to localStorage ----------------
+  useEffect(() => {
+    localStorage.setItem("accounts", JSON.stringify(accounts));
+  }, [accounts]);
+
+  useEffect(() => {
+    localStorage.setItem("notes", JSON.stringify(notes));
+  }, [notes]);
+
+  // ---------------- Auth Functions ----------------
+  function handleSignup(e) {
+    e.preventDefault();
+    const { username, email, password } = e.target;
+
+    const newAccount = {
+      username: username.value,
+      email: email.value,
+      password: password.value
+    };
+
+    setAccounts([...accounts, newAccount]);
+    setMode("login");
+    alert("Account created!");
+  }
+
+  function handleLogin(e) {
+    e.preventDefault();
+    const { identifier, password } = e.target;
+
+    const found = accounts.find(
+      a =>
+        (a.username === identifier.value ||
+         a.email === identifier.value) &&
+        a.password === password.value
+    );
+
+    if (found) {
+      setUser(found);
+      localStorage.setItem("currentUser", JSON.stringify(found));
+    } else {
+      setError("Invalid login.");
+    }
+  }
+
+  function logout() {
+    window.speechSynthesis.cancel();
+    setUser(null);
+    localStorage.removeItem("currentUser");
+  }
+
+  // ---------------- Speech ----------------
+  function toggleSpeech() {
+    const synth = window.speechSynthesis;
+
+    if (speechState === "stopped") {
+      const utterance = new SpeechSynthesisUtterance(
+        activeNote.content || "Nothing to read"
+      );
+      utterance.rate = speed;
+
+      utterance.onstart = () => setSpeechState("playing");
+      utterance.onend = () => setSpeechState("stopped");
+
+      synth.speak(utterance);
+    }
+    else if (speechState === "playing") {
+      synth.pause();
+      setSpeechState("paused");
+    }
+    else if (speechState === "paused") {
+      synth.resume();
+      setSpeechState("playing");
+    }
+  }
+
+  function stopSpeech() {
+    window.speechSynthesis.cancel();
+    setSpeechState("stopped");
+  }
+
+  // ---------------- Theme ----------------
+  const themes = {
+    light: "bg-white text-black",
+    dark: "bg-black text-white",
+    high: "bg-black text-yellow-400"
+  };
+
+  // ---------------- If Not Logged In ----------------
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="bg-white p-8 rounded shadow w-80">
+          <h2 className="text-2xl font-bold mb-4 text-center">
+            {mode === "login" ? "Login" : "Sign Up"}
+          </h2>
+
+          {error && <p className="text-red-500 mb-2">{error}</p>}
+
+          <form onSubmit={mode === "login" ? handleLogin : handleSignup}>
+            {mode === "signup" && (
+              <>
+                <input name="username" placeholder="Username" required className="w-full mb-2 p-2 border"/>
+                <input name="email" type="email" placeholder="Email" required className="w-full mb-2 p-2 border"/>
+              </>
+            )}
+
+            <input name="identifier" placeholder="Username or Email" required className="w-full mb-2 p-2 border"/>
+            <input name="password" type="password" placeholder="Password" required className="w-full mb-4 p-2 border"/>
+
+            <button className="w-full bg-blue-500 text-white p-2">
+              {mode === "login" ? "Login" : "Create Account"}
+            </button>
+          </form>
+
+          <button
+            onClick={() => setMode(mode === "login" ? "signup" : "login")}
+            className="text-blue-500 text-sm mt-3"
+          >
+            {mode === "login" ? "Need an account?" : "Already have one?"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ---------------- Main App ----------------
+  return (
+    <div className="h-screen flex flex-col">
+
+      <div className="bg-white p-4 flex justify-between">
+        <input
+          value={activeNote.title}
+          onChange={(e) =>
+            setActiveNote({ ...activeNote, title: e.target.value })
+          }
+          className="border p-2"
+        />
+        <button onClick={logout} className="text-red-500">Logout</button>
+      </div>
+
+      <div className="flex flex-1">
+
+        {/* Sidebar */}
+        <div className="w-60 bg-gray-200 p-4">
+          <button
+            onClick={() =>
+              setActiveNote({ id: Date.now(), title: "New Note", content: "" })
+            }
+            className="bg-blue-500 text-white p-2 w-full mb-4"
+          >
+            New Note
+          </button>
+
+          {notes.map(n => (
+            <div key={n.id}
+                 onClick={() => setActiveNote(n)}
+                 className="bg-white p-2 mb-2 cursor-pointer">
+              {n.title}
+            </div>
+          ))}
+        </div>
+
+        {/* Editor */}
+        <div
+          className="flex-1 p-6 relative"
+          onMouseMove={(e) => {
+            if (rulerOn) {
+              setRulerY(
+                e.clientY -
+                e.currentTarget.getBoundingClientRect().top
+              );
+            }
+          }}
+        >
+          {rulerOn &&
+            <div className="ruler" style={{ top: rulerY - 20 }}></div>
+          }
+
+          <div className="mb-4 flex gap-2 flex-wrap">
+
+            <button onClick={() => setFontSize(f => f + 2)}>A+</button>
+            <button onClick={() => setFontSize(f => f - 2)}>A-</button>
+
+            <button
+              onClick={() =>
+                setContrast(
+                  contrast === "light"
+                    ? "dark"
+                    : contrast === "dark"
+                    ? "high"
+                    : "light"
+                )
+              }
+            >
+              Contrast
+            </button>
+
+            <button onClick={() => setDyslexic(!dyslexic)}>
+              Dyslexic
+            </button>
+
+            <button onClick={() => setRulerOn(!rulerOn)}>
+              Ruler
+            </button>
+
+            <button onClick={toggleSpeech}>
+              {speechState === "playing"
+                ? "Pause"
+                : speechState === "paused"
+                ? "Resume"
+                : "Listen"}
+            </button>
+
+            <button onClick={stopSpeech}>Stop</button>
+
+            <button
+              onClick={() => {
+                const updated = notes.filter(n => n.id !== activeNote.id);
+                setNotes([activeNote, ...updated]);
+                alert("Saved");
+              }}
+            >
+              Save
+            </button>
+
+            <div>
+              Speed:
+              <input
+                type="range"
+                min="0.5"
+                max="2"
+                step="0.1"
+                value={speed}
+                onChange={(e) => setSpeed(parseFloat(e.target.value))}
+              />
+            </div>
+          </div>
+
+          <textarea
+            className={`w-full h-[75%] border p-4 ${themes[contrast]} ${dyslexic ? "dyslexic" : ""}`}
+            style={{ fontSize: fontSize }}
+            value={activeNote.content}
+            onChange={(e) =>
+              setActiveNote({ ...activeNote, content: e.target.value })
+            }
+          />
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+
+</script>
+</body>
+</html>
